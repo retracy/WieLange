@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 
 namespace WieLang
 {
@@ -11,6 +10,10 @@ namespace WieLang
             this.vThreshold = vThreshold;
         }
 
+        /// <summary>
+        /// Decode ETI waveform
+        /// </summary>
+        /// <returns></returns>
         public int Decode()
         {
             // Find trailing edge of IDLE(1) using pulse width trigger for pulse width ~ 250 ms
@@ -87,7 +90,7 @@ namespace WieLang
             return sum / (2 * n + 1);
         }
 
-        private double[] values;
-        private double vThreshold;
+        private readonly double[] values;
+        private readonly double vThreshold;
     }
 }
