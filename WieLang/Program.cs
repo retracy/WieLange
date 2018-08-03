@@ -5,14 +5,14 @@ using System.Diagnostics;
 
 namespace WieLang
 {
-    class Program
+    public class Program
     {
         static void Main(string[] args)
         {
             if (!File.Exists(args[0]))
                 return;
 
-            List<float>[] data = null;
+            List<double>[] data = null;
             using (var reader = new StreamReader(args[0]))
             {
                 while (!reader.EndOfStream)
@@ -22,31 +22,91 @@ namespace WieLang
 
                     if (data == null)
                     {
-                        data = new List<float>[values.Length];
+                        data = new List<double>[values.Length];
                         for (int i = 0; i < values.Length; i++)
                         {
-                            data[i] = new List<float>();
+                            data[i] = new List<double>();
                         }
                     }
 
                     for (int i = 0; i < values.Length; i++)
                     {
-                        data[i].Add(float.Parse(values[i]));
+                        data[i].Add(double.Parse(values[i]));
                     }
                 }
             }
 
             foreach (var trace in data)
             {
-                Decode(trace);
+                var wfm = new WaveformData(trace, 400e-3);
+                Decode(wfm, 18);
+
+                // Just decode 1 for now
+                break;
             }
         }
 
-        static private void Decode(IEnumerable<float> trace)
+        static private void Decode(WaveformData wfm, double vCutoff)
         {
-            // Find trailing edge of IDLE(1) using Pulse width trigger for pulse > 240 ms
+            int indexIdle1End = -1;
+            for (int i = 0; i < wfm.VoltageValues.Length; i++)
+            {
+                if (Average(wfm.VoltageValues, i, 10) < vCutoff)
+                {
+                    indexIdle1End = i - 1;
+                    break;
+                }
+            }
+            Debug.WriteLine($"Idle = {indexIdle1End}");
+
+            int indexTimingBit1 = -1;
+            for (int i = indexIdle1End + 1; i < wfm.VoltageValues.Length; i++)
+            {
+                if (Average(wfm.VoltageValues, i, 10) > vCutoff)
+                {
+                    indexTimingBit1 = i - 1;
+                    break;
+                }
+            }
+            Debug.WriteLine($"Bit1 = {indexTimingBit1}");
+
+            // Find trailing edge of IDLE(1) using Pulse width trigger for pulse ~ 250 ms
             // Identify IDLE(1)->0 and 0->1 frame begin marker
-            // Identify data->0->1->IDLE(0) frame end marker
+            // TODO - Identify data->0->1->IDLE(0) frame end marker
+        }
+
+        private static double Average(double[] values, int index, int n)
+        {
+            if (index < n)
+                n = index;
+            if (values.Length - index - 1 < n)
+                n = values.Length - index - 1;
+
+            double sum = 0;
+            for (int i = index - n; i <= index + n; i++)
+            {
+                sum += values[i];
+            }
+            return sum / (2 * n + 1);
+        }
+
+        public struct WaveformData
+        {
+            public WaveformData(List<double> values, double hscale)
+            {
+                HorizontalScale = hscale / (values.Count - 1);
+                VoltageValues = values.ToArray();
+            }
+
+            /// <summary>
+            /// Horizontal scale. Time between each point.
+            /// </summary>
+            public double HorizontalScale { get; set; }
+
+            /// <summary>
+            /// Voltage values. This is the value of each point on the waveform in volts.
+            /// </summary>
+            public double[] VoltageValues { get; set; }
         }
     }
 }
